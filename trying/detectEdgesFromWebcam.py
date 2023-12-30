@@ -1,5 +1,8 @@
 import cv2
 import numpy as np
+import numpy as np
+import imutils
+
 
 def process_frame(frame):
     # Convert to grayscale
@@ -32,7 +35,45 @@ def process_frame(frame):
 
             # Crop the rectangle area
             cropped = frame[y:y+h, x:x+w]
-            cropped_frames.append(cropped)
+
+            # Convert cropped frame to black and white and apply Canny edge detection
+            #black_white = cv2.cvtColor(cropped, cv2.COLOR_BGR2GRAY)
+            #edges = cv2.Canny(black_white, 400, 400)
+
+            gray = cv2.cvtColor(cropped, cv2.COLOR_BGR2GRAY)
+
+            blur = cv2.GaussianBlur(gray, (15, 15), 0)    
+            # Edge detection using Canny
+            edges = cv2.Canny(blur, 90, 80)
+
+
+            
+            cropped_frames.append(edges)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     return frame, cropped_frames
 
