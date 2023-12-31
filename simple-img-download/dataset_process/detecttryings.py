@@ -51,6 +51,8 @@ classes_to_detect = ["phone_back_camera"]
 # Initialize webcam
 cap = cv2.VideoCapture(0)
 
+# ... [previous code, including YOLO model initialization] ...
+
 while True:
     ret, frame = cap.read()
     if not ret:
@@ -58,7 +60,8 @@ while True:
 
     processed_frame, cropped_frames, (crop_x, crop_y, crop_w, crop_h) = process_frame(frame)
 
-    phone_detected = False  # Flag to check if phone is detected
+    highest_confidence = 0
+    highest_conf_box = None
 
     if cropped_frames:
         cropped_img = cropped_frames[0]
@@ -72,13 +75,15 @@ while True:
                 detected_class = model.names[cls]
 
                 if detected_class in classes_to_detect:
-                    phone_detected = True
-                    # Adjusted bounding box coordinates
-                    x1, y1, x2, y2 = map(int, box.xyxy[0])
-                    cv2.rectangle(processed_frame, (crop_x + x1, crop_y + y1), (crop_x + x2, crop_y + y2), (0, 0, 255), 3)
+                    confidence = box.conf[0]
+                    if confidence > highest_confidence:
+                        highest_confidence = confidence
+                        highest_conf_box = map(int, box.xyxy[0])
 
-    if phone_detected:
-        cv2.putText(processed_frame, "Phone camera detected", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+        if highest_conf_box:
+            x1, y1, x2, y2 = highest_conf_box
+            cv2.rectangle(processed_frame, (crop_x + x1, crop_y + y1), (crop_x + x2, crop_y + y2), (0, 0, 255), 3)
+            cv2.putText(processed_frame, "Phone camera detected", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
 
     cv2.imshow('Processed Frame', processed_frame)
     
