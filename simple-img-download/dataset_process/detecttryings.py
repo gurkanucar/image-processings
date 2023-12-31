@@ -51,7 +51,6 @@ classes_to_detect = ["phone_back_camera"]
 # Initialize webcam
 cap = cv2.VideoCapture(0)
 
-# ... [previous code, including YOLO model initialization] ...
 
 while True:
     ret, frame = cap.read()
@@ -82,6 +81,12 @@ while True:
 
         if highest_conf_box:
             x1, y1, x2, y2 = highest_conf_box
+            # Calculate phone camera position in the original frame
+            phone_pos_y = crop_y + (y1 + y2) / 2
+
+            # Determine if the phone is top to bottom or bottom to top
+            phone_position = "Top to Bottom" if phone_pos_y < crop_y + crop_h * 0.6 else "Bottom to Top"
+            cv2.putText(processed_frame, phone_position, (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
             cv2.rectangle(processed_frame, (crop_x + x1, crop_y + y1), (crop_x + x2, crop_y + y2), (0, 0, 255), 3)
             cv2.putText(processed_frame, "Phone camera detected", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
 
