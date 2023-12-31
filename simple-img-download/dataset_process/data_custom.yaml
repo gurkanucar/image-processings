@@ -1,0 +1,7 @@
+train: train
+val: val
+
+nc: 1
+
+names: ["phone_back_camera"]
+
