@@ -1,19 +1,21 @@
+
 import cv2
 from ultralytics import YOLO
-import cv2
-import math
+import numpy as np
+import os
+
+# change path to working dir
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
+
 
 
 def process_frame(frame):
-    # Convert to grayscale
+    # Convert to grayscale and apply adaptive threshold
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-
-    # Adaptive threshold
     thresh = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 51, 9)
 
-    # Fill rectangular contours
-    cnts = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    cnts = cnts[0] if len(cnts) == 2 else cnts[1]
+    # Find contours and fill them
+    cnts, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     for c in cnts:
         cv2.drawContours(thresh, [c], -1, (255, 255, 255), -1)
 
@@ -21,92 +23,76 @@ def process_frame(frame):
     kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (9, 9))
     opening = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel, iterations=4)
 
-    # Draw rectangles
-    cnts = cv2.findContours(opening, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    cnts = cnts[0] if len(cnts) == 2 else cnts[1]
+    # Find contours for bounding boxes
+    cnts, _ = cv2.findContours(opening, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     area_threshold = 4000
 
     cropped_frames = []
-
-    for c in cnts:
-        if cv2.contourArea(c) > area_threshold:
-            x, y, w, h = cv2.boundingRect(c)
+    if cnts:  # Check if there are any contours
+        largest_contour = max(cnts, key=cv2.contourArea)
+        if cv2.contourArea(largest_contour) > area_threshold:
+            x, y, w, h = cv2.boundingRect(largest_contour)
+            # Apply offset
+            offset = 5
+            x, y, w, h = x - offset, y - offset, w + 2 * offset, h + 2 * offset
+            # Ensure coordinates are within frame boundaries
+            x, y, w, h = max(0, x), max(0, y), min(w, frame.shape[1] - x), min(h, frame.shape[0] - y)
             cv2.rectangle(frame, (x, y), (x + w, y + h), (36, 255, 12), 3)
-
-            # Crop the rectangle area
             cropped = frame[y:y+h, x:x+w]
             cropped_frames.append(cropped)
 
     return frame, cropped_frames
 
-# change path to working dir
-import os
-os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 model = YOLO("best.pt")
-
 classes_to_detect = ["phone_back_camera"]
 
-max_cropped_frames = 0
-open_windows = set()
 
 
-# Start webcam
+# Initialize webcam
 cap = cv2.VideoCapture(0)
-cap.set(3, 640)
-cap.set(4, 480)
+cropped_window_open = False
+
 
 while True:
-
     ret, frame = cap.read()
     if not ret:
         break
 
     processed_frame, cropped_frames = process_frame(frame)
 
-    # Create a dictionary to store the highest-confidence detection for each class
-    highest_confidence = {}
+    phone_detected = False  # Flag to check if phone is detected
 
-    # Iterate over cropped frames
-    # Iterate over cropped frames
-    for cropped_frame in cropped_frames:
-        results = model(cropped_frame)
+    if cropped_frames:
+        cropped_img = cropped_frames[0]
+        results = model(cropped_img, stream=True)
 
-        # Access the prediction results
-        pred = results.pred[0]
+        for r in results:
+            boxes = r.boxes
 
-        # Iterate over detected objects
-        for r in pred:
-            # Bounding box
-            x1, y1, x2, y2 = r.xyxy
+            for box in boxes:
+                # Class name
+                cls = int(box.cls[0])
+                detected_class = model.names[cls]
 
-            # Convert confidence to float
-            confidence = float(r.conf)
+                if detected_class in classes_to_detect:
+                    phone_detected = True
+                    # [Continue with your bounding box drawing logic]
 
-            # Class name
-            cls = int(r.cls)
-            detected_class = model.names[cls]
+    if phone_detected:
+        cv2.putText(processed_frame, "Phone camera detected", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
 
-            # Check if the detected class is in classes_to_detect
-            if detected_class in classes_to_detect:
-                # If the class is not in the dictionary or has higher confidence, update it
-                if detected_class not in highest_confidence or confidence > highest_confidence[detected_class][0]:
-                    highest_confidence[detected_class] = (confidence, (x1, y1, x2, y2))
+    cv2.imshow('Processed Frame', processed_frame)
 
+    if cropped_frames:
+        cv2.imshow('Cropped Frame', cropped_img)
+        cropped_window_open = True
+    elif cropped_window_open:
+        cv2.destroyWindow('Cropped Frame')
+        cropped_window_open = False
 
-    # Iterate over the highest-confidence detections and draw rectangles and labels on the processed frame
-    for detected_class, (confidence, (x1, y1, x2, y2)) in highest_confidence.items():
-        cv2.rectangle(processed_frame, (x1, y1), (x2, y2), (255, 0, 255), 3)
-        cv2.putText(processed_frame, f"{detected_class}: {confidence:.2f}",
-                    (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
-
-    # Display the processed frame with bounding boxes and labels
-    cv2.imshow('Webcam', processed_frame)
-    if cv2.waitKey(1) == ord('q'):
+    if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 
-# Release the capture and close all windows
 cap.release()
-for window in open_windows:
-    cv2.destroyWindow(window)
 cv2.destroyAllWindows()
