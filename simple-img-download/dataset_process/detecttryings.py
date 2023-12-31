@@ -28,6 +28,7 @@ def process_frame(frame):
     area_threshold = 4000
 
     cropped_frames = []
+    x, y, w, h = 0, 0, 0, 0  # Initialize variables
     if cnts:  # Check if there are any contours
         largest_contour = max(cnts, key=cv2.contourArea)
         if cv2.contourArea(largest_contour) > area_threshold:
@@ -41,25 +42,21 @@ def process_frame(frame):
             cropped = frame[y:y+h, x:x+w]
             cropped_frames.append(cropped)
 
-    return frame, cropped_frames
+    return frame, cropped_frames, (x, y, w, h)
 
 
 model = YOLO("best.pt")
 classes_to_detect = ["phone_back_camera"]
 
-
-
 # Initialize webcam
 cap = cv2.VideoCapture(0)
-cropped_window_open = False
-
 
 while True:
     ret, frame = cap.read()
     if not ret:
         break
 
-    processed_frame, cropped_frames = process_frame(frame)
+    processed_frame, cropped_frames, (crop_x, crop_y, crop_w, crop_h) = process_frame(frame)
 
     phone_detected = False  # Flag to check if phone is detected
 
@@ -71,25 +68,22 @@ while True:
             boxes = r.boxes
 
             for box in boxes:
-                # Class name
                 cls = int(box.cls[0])
                 detected_class = model.names[cls]
 
                 if detected_class in classes_to_detect:
                     phone_detected = True
-                    # [Continue with your bounding box drawing logic]
+                    # Adjusted bounding box coordinates
+                    x1, y1, x2, y2 = map(int, box.xyxy[0])
+                    cv2.rectangle(processed_frame, (crop_x + x1, crop_y + y1), (crop_x + x2, crop_y + y2), (0, 0, 255), 3)
 
     if phone_detected:
         cv2.putText(processed_frame, "Phone camera detected", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
 
     cv2.imshow('Processed Frame', processed_frame)
-
+    
     if cropped_frames:
         cv2.imshow('Cropped Frame', cropped_img)
-        cropped_window_open = True
-    elif cropped_window_open:
-        cv2.destroyWindow('Cropped Frame')
-        cropped_window_open = False
 
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
