@@ -40,6 +40,28 @@ def draw_boxes(image, detections):
             cv2.rectangle(image, (x1, y1), (x2, y2), (255, 0, 255), 3)
             cv2.putText(image, f"{detected_class}: {round(confidence, 2):.2f}",
                         (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
+def get_center(box):
+    x1, y1, x2, y2 = map(int, box)
+    center_x = (x1 + x2) // 2
+    center_y = (y1 + y2) // 2
+    return center_x, center_y
+
+def annotate_image(image, phone_box, camera_box):
+    # Check if both detections are valid and not empty
+    if phone_box is not None and camera_box is not None and phone_box.numel() > 0 and camera_box.numel() > 0:
+        _, phone_center_y = get_center(phone_box)
+        _, camera_center_y = get_center(camera_box)
+
+        phone_height = abs(int(phone_box[3]) - int(phone_box[1]))
+        threshold = phone_center_y + 0.6 * phone_height
+
+        text = "Bottom -> Top" if camera_center_y > threshold else "Top -> Bottom"
+        cv2.putText(image, text, (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+    else:
+        # Handle case where detections are None or empty
+        print("No valid phone or camera box found for annotation.")
+
+
 
 while True:
     success, img = cap.read()
@@ -52,6 +74,19 @@ while True:
     # Detect highest confidence boxes using both models
     detection1 = detect_highest_confidence(model1, cropped_img, classes_model1)
     detection2 = detect_highest_confidence(model2, cropped_img, classes_model2)
+
+    if detection1 and detection1[2] == "cell phone":
+        phone_box = detection1[1]
+    else:
+        phone_box = None
+
+    if detection2 and detection2[2] == "phone_back_camera":
+        camera_box = detection2[1]
+    else:
+        camera_box = None
+
+    # Annotate the image based on the position of the camera
+    annotate_image(cropped_img, phone_box, camera_box)
 
     # Draw boxes for highest confidence detections
     draw_boxes(cropped_img, [detection1, detection2])
