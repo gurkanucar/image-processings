@@ -1,4 +1,3 @@
-
 import cv2
 
 # Mouse callback function to draw the rectangle
