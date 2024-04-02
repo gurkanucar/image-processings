@@ -20,7 +20,8 @@ class CircleDetector:
         self.height, self.width = self.org_img.shape[:2]
 
     def preprocess_image(self):
-        self.img = self.org_img[340:self.height-350, 170:self.width-170]
+       # self.img = self.org_img[340:self.height-350, 170:self.width-170]
+        self.img = self.org_img
         self.hsv = cv2.cvtColor(self.img, cv2.COLOR_BGR2HSV)
 
     def detect_circles(self):
@@ -60,10 +61,10 @@ class CircleDetector:
             for label, bbox in self.bbox_list:
                 label_index = self.labels.index(label)  # Get the index of the label
 
-                x_min = bbox[0] + 170
-                y_min = bbox[1] + 340
-                x_max = bbox[2] + 170
-                y_max = bbox[3] + 340
+                x_min = bbox[0]# + 170
+                y_min = bbox[1]# + 340
+                x_max = bbox[2]# + 170
+                y_max = bbox[3]# + 340
 
                 x_center = (x_min + x_max) / 2 / self.width
                 y_center = (y_min + y_max) / 2 / self.height
@@ -80,9 +81,10 @@ class CircleDetector:
 
     def display_results(self):
         scale_percent = 50
-        cv2.imshow("Detected Circle", self.resize_image(self.img, scale_percent))
-        for label, filtered_img in self.filtered_imgs.items():
-            cv2.imshow(f"filtered_{label}", self.resize_image(filtered_img, scale_percent))
+        image_name = os.path.basename(self.image_path).split('.')[0]  # Get the name of the image without the extension
+        cv2.imshow(f"Detected Circle - {image_name}", self.resize_image(self.img, scale_percent))
+        # for label, filtered_img in self.filtered_imgs.items():
+        #     cv2.imshow(f"filtered_{label} - {image_name}", self.resize_image(filtered_img, scale_percent))
 
     @staticmethod
     def resize_image(image, scale_percent):
@@ -113,6 +115,17 @@ def main():
     # Save labels and classes
     detector.save_labels()
     detector.save_classes()
+
+    detector2 = CircleDetector('jig2.png', color_ranges, labels)
+
+    # Detect circles
+    detector2.detect_circles()
+
+    # Display results
+    detector2.display_results()
+
+    # Save labels and classes
+    detector2.save_labels()
 
     # Wait for a key press to close the windows
     cv2.waitKey(0)
